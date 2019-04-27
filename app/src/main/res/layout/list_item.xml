@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/device_list_height"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+
+    <android.support.v7.widget.GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:columnCount="3"
+        app:columnOrderPreserved="false"
+        app:rowCount="1">
+
+        <ImageView
+            android:id="@+id/ivDevice"
+            android:layout_width="@dimen/device_icon_dim"
+            android:layout_height="@dimen/device_icon_dim"
+            android:layout_marginLeft="@dimen/list_device_icon_left_margin" />
+
+        <TextView
+            android:id="@+id/lblListItem"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingLeft="@dimen/device_name_padding"
+            android:textSize="@dimen/device_text_size"
+            app:layout_gravity="fill_horizontal" />
+
+        <Switch
+            android:id="@+id/deviceControlSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/device_icon_dim"
+
+            tools:layout_marginRight="@dimen/device_switch_margin" />
+    </android.support.v7.widget.GridLayout>
+
+
+</LinearLayout>

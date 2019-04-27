@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/list_device_gateway_background"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="@dimen/list_padding">
+
+    <ImageView
+        android:id="@+id/iv_gateway"
+        android:layout_width="@dimen/device_icon_dim"
+        android:layout_height="@dimen/device_icon_dim"
+        android:layout_marginLeft="@dimen/gateway_icon_left_margin"
+        android:src="@drawable/ic_gateway" />
+
+    <TextView
+        android:id="@+id/lblListHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:text="Device name"
+        android:textColor="@color/gateway_text_color"
+        android:textSize="@dimen/gateway_text_size"
+        android:textStyle="bold" />
+
+</LinearLayout>
