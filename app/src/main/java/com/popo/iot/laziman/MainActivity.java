@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.support.design.widget.CoordinatorLayout;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
+import android.util.Base64;
 import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -24,6 +25,7 @@ import android.widget.Toast;
 
 import com.google.api.services.cloudiot.v1.model.DeviceRegistry;
 
+import com.google.api.services.cloudiot.v1.model.DeviceState;
 import com.popo.iot.laziman.callback.DeviceCallback;
 import com.popo.iot.laziman.util.Message;
 import com.popo.iot.laziman.data.Configuration;
@@ -43,6 +45,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -68,7 +71,6 @@ public class MainActivity extends AppCompatActivity
 
     //devices
     public static CloudConfig cloudConfig;
-    public static CustomDevice me;
     private static Configuration configuration;
     private List<CustomGateway> gateways;
 
@@ -408,10 +410,11 @@ public class MainActivity extends AppCompatActivity
         HashMap<String, String> deviceHashMap = new HashMap<String, String>();
 
         for (CustomGateway gateway:gateways) {
-            deviceHashMap.put(gateway.getGatewayId(), gateway.getGatewayId());
+            deviceHashMap.put(gateway.getDeviceId(), gateway.getDeviceId());
 
-            gateway.setDevices(DeviceRegistryImpl.listDevicesForGateway(configuration.getProjectId(), configuration.getCloudRegion(), configuration.getRegistryId(),gateway.getGatewayId()));
+            gateway.setDevices(DeviceRegistryImpl.listDevicesForGateway(configuration.getProjectId(), configuration.getCloudRegion(), configuration.getRegistryId(),gateway.getDeviceId()));
             for (CustomDevice device: gateway.getDevices()) {
+
                 deviceHashMap.put(device.getDeviceId(), device.getDeviceId());
             }
         }
@@ -423,19 +426,15 @@ public class MainActivity extends AppCompatActivity
         List<CustomDevice> directControlDevices = new ArrayList<CustomDevice>();
         for (CustomDevice device: allDevices) {
 
-            if(device.getDeviceType().equals(DeviceType.mobile)){
-                if(device.getDeviceId().equals(configuration.getMyId())){
-                    me = device;
-                }
-            }else if(!deviceHashMap.containsKey(device.getDeviceId())){
+            if(!deviceHashMap.containsKey(device.getDeviceId())){
                 directControlDevices.add(device);
             }
         }
 
         if(directControlDevices.size() > 0) {
             CustomGateway directControlGateway = new CustomGateway();
-            directControlGateway.setGatewayId("-1");
-            directControlGateway.setGatewayName("Direct control device");
+            directControlGateway.setDeviceId("-1");
+            directControlGateway.setDeviceName("Direct control device");
 
             directControlGateway.setDevices(directControlDevices);
             gateways.add(directControlGateway);
@@ -475,7 +474,7 @@ public class MainActivity extends AppCompatActivity
             @Override
             public void onGroupExpand(int groupPosition) {
                 Toast.makeText(getApplicationContext(),
-                        gateways.get(groupPosition).getGatewayName() + " Expanded",
+                        gateways.get(groupPosition).getDeviceName() + " Expanded",
                         Toast.LENGTH_SHORT).show();
             }
         });
@@ -504,7 +503,7 @@ public class MainActivity extends AppCompatActivity
             @Override
             public void onGroupCollapse(int groupPosition) {
                 Toast.makeText(getApplicationContext(),
-                        gateways.get(groupPosition).getGatewayName() + " Collapsed",
+                        gateways.get(groupPosition).getDeviceName() + " Collapsed",
                         Toast.LENGTH_SHORT).show();
 
             }

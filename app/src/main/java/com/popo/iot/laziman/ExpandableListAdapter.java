@@ -23,12 +23,15 @@ import com.google.api.services.cloudiot.v1.model.Device;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.popo.iot.laziman.callback.DeviceCallback;
+import com.popo.iot.laziman.util.GsonUtil;
 import com.popo.iot.laziman.util.Message;
 import com.popo.laziman.cloud.iot.DeviceRegistryImpl;
 import com.popo.laziman.cloud.iot.MqttMobileImpl;
 import com.popo.laziman.cloud.iot.model.Command;
 import com.popo.laziman.cloud.iot.model.CustomDevice;
 import com.popo.laziman.cloud.iot.model.CustomGateway;
+import com.popo.laziman.cloud.iot.model.CustomState;
+import com.popo.laziman.cloud.iot.model.DeviceMode;
 import com.popo.laziman.cloud.iot.model.DeviceType;
 
 
@@ -44,7 +47,7 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
 
         for (CustomGateway gateway:gateways) {
             _listDataChild = new HashMap<String, List<CustomDevice>>();
-            _listDataChild.put(gateway.getGatewayId(), gateway.getDevices());
+            _listDataChild.put(gateway.getDeviceId(), gateway.getDevices());
         }
 
     }
@@ -89,6 +92,14 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
         txtListChild.setText(device.getDeviceName());
 
         Switch deviceControlSwitch =(Switch) convertView.findViewById(R.id.deviceControlSwitch);
+
+        if(device.getState() == null || device.getState().getState().equals(CustomState.off)){
+            deviceControlSwitch.setChecked(false);
+        }else{
+            deviceControlSwitch.setChecked(true);
+        }
+
+
         deviceControlSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -97,7 +108,8 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
 
         });
 
-        //subscribe(device, deviceControlSwitch);
+
+        System.out.println("======================== refresh child view of " +this._listDataHeader.get(groupPosition).getDeviceId() + " =============================");
 
         return convertView;
     }
@@ -133,7 +145,7 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
         }
 
 
-        if(gateway.getGatewayId().equals("-1")){
+        if(gateway.getDeviceId().equals("-1")){
             ((ImageView) convertView.findViewById(R.id.iv_gateway)).setImageResource(R.drawable.ic_lightning);
         }else{
             ((ImageView) convertView.findViewById(R.id.iv_gateway)).setImageResource(R.drawable.ic_gateway);
@@ -142,7 +154,7 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
         TextView lblListHeader = (TextView) convertView
                 .findViewById(R.id.lblListHeader);
         lblListHeader.setTypeface(null, Typeface.BOLD);
-        lblListHeader.setText(gateway.getGatewayName());
+        lblListHeader.setText(gateway.getDeviceName());
 
         return convertView;
     }
@@ -181,27 +193,19 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
             try {
                 Command command = new Command();
                 command.setDeviceId(device.getDeviceId());
-                command.setType(Command.CommandType.control);
+                command.setMode(DeviceMode.manual);
                 Calendar calendar = Calendar.getInstance();
-                command.setRequestTime(calendar.getTime());
+                command.setCommandDate(calendar.getTime());
                 calendar.add(Calendar.MINUTE, 1);
-                command.setExpireTime(calendar.getTime());
-
 
                 if (isChecked) {
-                    command.setControl(Command.ControlType.on);
+                    command.setState(CustomState.on);
                 } else {
-                    command.setControl(Command.ControlType.off);
+                    command.setState(CustomState.off);
                 }
-                Gson gson = new GsonBuilder()
-                        .enableComplexMapKeySerialization()
-                        .serializeNulls()
-                        .setDateFormat("yyyy-MM-dd HH:mm:ss")
-                        .setPrettyPrinting()
-                        .setVersion(1.0)
-                        .create();
 
-                DeviceRegistryImpl.sendCommand(device.getDeviceId(), MainActivity.cloudConfig.projectId, MainActivity.cloudConfig.cloudRegion, MainActivity.cloudConfig.registryId, gson.toJson(command));
+
+                DeviceRegistryImpl.sendCommand(device.getDeviceId(), MainActivity.cloudConfig.projectId, MainActivity.cloudConfig.cloudRegion, MainActivity.cloudConfig.registryId, GsonUtil.toJson(command));
             }catch(Exception e){
                 e.printStackTrace();
             }
@@ -215,7 +219,7 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
 
     }
 
-
+/*
     public String subscribe(CustomDevice device, Switch deviceControlSwitch)   {
 
         try {
@@ -230,5 +234,5 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
             e.printStackTrace();
         }
         return "true";
-    }
+    }*/
 }
