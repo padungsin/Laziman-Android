@@ -1,14 +1,20 @@
 package com.popo.iot.laziman;
 
+import android.app.job.JobInfo;
+import android.app.job.JobScheduler;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Looper;
 import android.support.design.widget.CoordinatorLayout;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.util.Base64;
+import android.util.Log;
 import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -18,6 +24,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ExpandableListView;
 import android.widget.TextView;
@@ -27,14 +34,18 @@ import com.google.api.services.cloudiot.v1.model.DeviceRegistry;
 
 import com.google.api.services.cloudiot.v1.model.DeviceState;
 import com.popo.iot.laziman.callback.DeviceCallback;
+import com.popo.iot.laziman.util.GsonUtil;
 import com.popo.iot.laziman.util.Message;
 import com.popo.iot.laziman.data.Configuration;
 import com.popo.iot.laziman.data.ConfigurationDataAdapter;
 import com.popo.laziman.cloud.iot.CloudConfig;
 import com.popo.laziman.cloud.iot.DeviceRegistryImpl;
 import com.popo.laziman.cloud.iot.MqttMobileImpl;
+import com.popo.laziman.cloud.iot.model.Command;
 import com.popo.laziman.cloud.iot.model.CustomDevice;
 import com.popo.laziman.cloud.iot.model.CustomGateway;
+import com.popo.laziman.cloud.iot.model.CustomState;
+import com.popo.laziman.cloud.iot.model.DeviceMode;
 import com.popo.laziman.cloud.iot.model.DeviceType;
 
 
@@ -47,11 +58,17 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
+
+    private static final String TAG = MainActivity.class.getSimpleName();
+
 
     //public static Configuration configuration;
     private ConfigurationDataAdapter dataAdapter;
@@ -71,13 +88,16 @@ public class MainActivity extends AppCompatActivity
 
     //devices
     public static CloudConfig cloudConfig;
-    private static Configuration configuration;
-    private List<CustomGateway> gateways;
-
+    public static Configuration configuration;
 
     //device list page
     private ExpandableListAdapter listAdapter;
     private ExpandableListView expListView;
+    public static List<CustomGateway> gateways = new ArrayList<>();
+
+
+    private Handler mHandler = new Handler();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -346,7 +366,7 @@ public class MainActivity extends AppCompatActivity
         if(registry == null){
             return "false";
         }
-        fetchDeviceList();
+
         return "true";
     }
     private String backgroundUpdateRegistry() throws Exception{
@@ -359,7 +379,6 @@ public class MainActivity extends AppCompatActivity
         configuration.setRegistryId(registry.getId());
         dataAdapter.update(configuration);
 
-        fetchDeviceList();
         return "true";
     }
 
@@ -367,7 +386,7 @@ public class MainActivity extends AppCompatActivity
     //in progress Task
 
     //post background Task
-    private void postInitialCloudCheck(String result){
+    private void postInitialCloudCheck(String result) throws  Exception{
 
         cloudEnable = Boolean.valueOf(result);
         setCloudStatus();
@@ -375,7 +394,7 @@ public class MainActivity extends AppCompatActivity
             return;
         }
 
-        refreshDeviceListPage();
+        fetchDeviceList();
 
     }
 
@@ -391,7 +410,7 @@ public class MainActivity extends AppCompatActivity
             coordinatorLayout.addView(currentView);
             message.setVisibility(View.INVISIBLE);
 
-            refreshDeviceListPage();
+
 
         }else{
 
@@ -406,41 +425,22 @@ public class MainActivity extends AppCompatActivity
 
     private void fetchDeviceList() throws  Exception{
 
-        gateways = DeviceRegistryImpl.listGateways(configuration.getProjectId(), configuration.getCloudRegion(), configuration.getRegistryId());
-        HashMap<String, String> deviceHashMap = new HashMap<String, String>();
 
-        for (CustomGateway gateway:gateways) {
-            deviceHashMap.put(gateway.getDeviceId(), gateway.getDeviceId());
 
-            gateway.setDevices(DeviceRegistryImpl.listDevicesForGateway(configuration.getProjectId(), configuration.getCloudRegion(), configuration.getRegistryId(),gateway.getDeviceId()));
-            for (CustomDevice device: gateway.getDevices()) {
+        final Handler handler = new Handler();
+        Timer timer = new Timer();
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                handler.post(new Runnable() {
+                    public void run() {
+                        new RefreshDeviceTask().execute();
 
-                deviceHashMap.put(device.getDeviceId(), device.getDeviceId());
+                    }
+                });
             }
-        }
-
-        //Direct control device
-        List<CustomDevice> allDevices = DeviceRegistryImpl.listDevices(configuration.getProjectId(), configuration.getCloudRegion(), configuration.getRegistryId());
-
-
-        List<CustomDevice> directControlDevices = new ArrayList<CustomDevice>();
-        for (CustomDevice device: allDevices) {
-
-            if(!deviceHashMap.containsKey(device.getDeviceId())){
-                directControlDevices.add(device);
-            }
-        }
-
-        if(directControlDevices.size() > 0) {
-            CustomGateway directControlGateway = new CustomGateway();
-            directControlGateway.setDeviceId("-1");
-            directControlGateway.setDeviceName("Direct control device");
-
-            directControlGateway.setDevices(directControlDevices);
-            gateways.add(directControlGateway);
-
-        }
-
+        };
+        timer.schedule(task, 0, 20000); //it executes this every 1000ms
 
     }
 
@@ -458,11 +458,16 @@ public class MainActivity extends AppCompatActivity
         }
 
     }
-    private void refreshDeviceListPage(){
+    public void initialDeviceListPage() throws  Exception{
+
+
+        //find old setting
+
+
+         listAdapter = new ExpandableListAdapter(this);
 
         // get the listview
         expListView = (ExpandableListView) findViewById(R.id.lvDeviceControl);
-        listAdapter = new ExpandableListAdapter(this, gateways);
 
         // setting list adapter
         expListView.setAdapter(listAdapter);
@@ -474,28 +479,12 @@ public class MainActivity extends AppCompatActivity
             @Override
             public void onGroupExpand(int groupPosition) {
                 Toast.makeText(getApplicationContext(),
-                        gateways.get(groupPosition).getDeviceName() + " Expanded",
+                        ((CustomGateway)listAdapter.getGroup(groupPosition)).getDeviceName() + " Expanded",
                         Toast.LENGTH_SHORT).show();
             }
         });
 
-        /*
-        // Listview on child click listener
-        expListView.setOnChildClickListener(new ExpandableListView.OnChildClickListener() {
 
-            @Override
-            public boolean onChildClick(ExpandableListView parent, View v,
-                                        int groupPosition, int childPosition, long id) {
-                Toast.makeText(
-                        getApplicationContext(),
-                        gateways.get(groupPosition).getGatewayDevice().getMetadata().get("name")
-                                + " : "
-                                + gateways.get(groupPosition).getDevices().get(childPosition).getMetadata().get("name"), Toast.LENGTH_SHORT)
-                        .show();
-                return false;
-            }
-        });
-        */
 
         // Listview Group collasped listener
         expListView.setOnGroupCollapseListener(new ExpandableListView.OnGroupCollapseListener() {
@@ -503,11 +492,88 @@ public class MainActivity extends AppCompatActivity
             @Override
             public void onGroupCollapse(int groupPosition) {
                 Toast.makeText(getApplicationContext(),
-                        gateways.get(groupPosition).getDeviceName() + " Collapsed",
+                        ((CustomGateway)listAdapter.getGroup(groupPosition)).getDeviceName() + " Collapsed",
                         Toast.LENGTH_SHORT).show();
 
             }
         });
+    }
+
+
+
+    private class RefreshDeviceTask extends AsyncTask<String, Void, String> {
+
+
+        public  RefreshDeviceTask(){
+
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Create Show ProgressBar
+        }
+
+        protected String doInBackground(String... urls)   {
+            try {
+
+
+                gateways = DeviceRegistryImpl.listGateways(MainActivity.configuration.getProjectId(), MainActivity.configuration.getCloudRegion(), MainActivity.configuration.getRegistryId());
+
+                HashMap<String, String> deviceHashMap = new HashMap<String, String>();
+                for (CustomGateway gateway:gateways) {
+                    gateway.setDevices(DeviceRegistryImpl.listDevicesForGateway(MainActivity.configuration.getProjectId(), MainActivity.configuration.getCloudRegion(), MainActivity.configuration.getRegistryId(),gateway.getDeviceId()));
+
+                    for (CustomDevice device: gateway.getDevices()) {
+
+                        deviceHashMap.put(device.getDeviceId(), device.getDeviceId());
+                    }
+                }
+
+                //Direct control device
+                List<CustomDevice> allDevices = DeviceRegistryImpl.listNonGatewayDevices(MainActivity.configuration.getProjectId(), MainActivity.configuration.getCloudRegion(), MainActivity.configuration.getRegistryId());
+
+
+                List<CustomDevice> directControlDevices = new ArrayList<>();
+                for (CustomDevice device: allDevices) {
+
+                    if(!deviceHashMap.containsKey(device.getDeviceId())){
+                        directControlDevices.add(device);
+                    }
+                }
+
+                if(directControlDevices.size() > 0) {
+                    CustomGateway directControlGateway = new CustomGateway();
+                    directControlGateway.setDeviceId("-1");
+                    directControlGateway.setDeviceName("Direct control device");
+
+                    directControlGateway.setDevices(directControlDevices);
+
+                    gateways.add(directControlGateway);
+
+                }
+
+
+            }catch(Exception e){
+                return  "false";
+            }
+            return "true";
+        }
+
+        protected void onPostExecute(String result)  {
+
+            try {
+                if(listAdapter == null) {
+                    initialDeviceListPage();
+                }else{
+                    listAdapter.refresh();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+
+        }
+
     }
 
 }

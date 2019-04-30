@@ -1,16 +1,18 @@
 package com.popo.iot.laziman;
 
 import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 
+import android.app.job.JobInfo;
+import android.app.job.JobScheduler;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.AsyncTask;
-import android.os.Looper;
+import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseExpandableListAdapter;
@@ -19,36 +21,34 @@ import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.TextView;
 
-import com.google.api.services.cloudiot.v1.model.Device;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.popo.iot.laziman.callback.DeviceCallback;
 import com.popo.iot.laziman.util.GsonUtil;
-import com.popo.iot.laziman.util.Message;
 import com.popo.laziman.cloud.iot.DeviceRegistryImpl;
-import com.popo.laziman.cloud.iot.MqttMobileImpl;
 import com.popo.laziman.cloud.iot.model.Command;
 import com.popo.laziman.cloud.iot.model.CustomDevice;
 import com.popo.laziman.cloud.iot.model.CustomGateway;
 import com.popo.laziman.cloud.iot.model.CustomState;
 import com.popo.laziman.cloud.iot.model.DeviceMode;
-import com.popo.laziman.cloud.iot.model.DeviceType;
 
 
 public class ExpandableListAdapter  extends BaseExpandableListAdapter {
+    private static final String TAG = ExpandableListAdapter.class.getSimpleName();
     private Context _context;
     private List<CustomGateway> _listDataHeader; // header titles
+
+
     // child data in format of header title, child title
-    private HashMap<String, List<CustomDevice>> _listDataChild;
+    //private HashMap<String, List<CustomDevice>> _listDataChild;
 
-    public ExpandableListAdapter(Context context, List<CustomGateway> gateways) {
+
+
+    public ExpandableListAdapter(Context context) throws Exception{
         this._context = context;
-        this._listDataHeader = gateways;
+        this._listDataHeader = MainActivity.gateways;
+    }
 
-        for (CustomGateway gateway:gateways) {
-            _listDataChild = new HashMap<String, List<CustomDevice>>();
-            _listDataChild.put(gateway.getDeviceId(), gateway.getDevices());
-        }
+    public void refresh(){
+        this._listDataHeader = MainActivity.gateways;
+        notifyDataSetChanged();
 
     }
 
@@ -170,6 +170,9 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
     }
 
 
+
+
+
     private class SendCommandTask extends AsyncTask<String, Void, String> {
 
         private  CompoundButton buttonView;
@@ -207,32 +210,18 @@ public class ExpandableListAdapter  extends BaseExpandableListAdapter {
 
                 DeviceRegistryImpl.sendCommand(device.getDeviceId(), MainActivity.cloudConfig.projectId, MainActivity.cloudConfig.cloudRegion, MainActivity.cloudConfig.registryId, GsonUtil.toJson(command));
             }catch(Exception e){
-                e.printStackTrace();
+                return  "false";
             }
             return "true";
         }
 
         protected void onPostExecute(String result)  {
 
+            buttonView.setEnabled(Boolean.valueOf(result));
+
 
         }
 
     }
 
-/*
-    public String subscribe(CustomDevice device, Switch deviceControlSwitch)   {
-
-        try {
-
-
-            System.out.println(device.getDeviceName() + " Waiting for state!!");
-            DeviceCallback callback = new DeviceCallback();
-             MqttMobileImpl.getInstance(MainActivity.me, new DeviceCallback()).listenForEvent(device);
-
-            System.out.println("=========================================================");
-        }catch(Exception e){
-            e.printStackTrace();
-        }
-        return "true";
-    }*/
 }
